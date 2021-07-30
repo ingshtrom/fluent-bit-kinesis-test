@@ -1,0 +1,58 @@
+services:
+  fluent-bit:
+    container_name: fluent-bit
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 24242:24242
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - /Users/alexhokanson/.aws:/root/.aws
+      - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
+      - ./parsers.conf:/fluent-bit/etc/parsers.conf
+      - haproxy-log:/var/log/haproxy
+      - fluent-bit-data:/var/log/fluent-bit
+    depends_on:
+      - prometheus
+      - grafana
+      - producer
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:latest
+    ports:
+      - 9000:9090
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus-data:/prometheus
+    command: --web.enable-lifecycle  --config.file=/etc/prometheus/prometheus.yml
+
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:latest
+    ports:
+      - 3000:3000
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+  producer:
+    container_name: producer
+    image: ubuntu:latest
+    entrypoint: ["/tmp/log.sh"]
+    environment:
+      - DEBUG=false
+      - SLEEP=2
+    volumes:
+      - haproxy-log:/var/log/haproxy
+      - ./haproxy.log:/tmp/haproxy.log
+      - ./producer/log.sh:/tmp/log.sh
+
+volumes:
+  prometheus-data: {}
+  grafana-data: {}
+  haproxy-log: {}
+  fluent-bit-data: {}
